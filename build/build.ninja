@@ -49,7 +49,7 @@ cmake_ninja_workdir = D$:\Project\zwidgetv2\build\
 
 build cmake_object_order_depends_target_zwidget: phony || .
 
-build CMakeFiles\zwidget.dir\src\main.cpp.obj: CXX_COMPILER__zwidget_unscanned_Debug D$:\Project\zwidgetv2\src\main.cpp || cmake_object_order_depends_target_zwidget
+build CMakeFiles\zwidget.dir\src\test_multi_window.cpp.obj: CXX_COMPILER__zwidget_unscanned_Debug D$:\Project\zwidgetv2\src\test_multi_window.cpp || cmake_object_order_depends_target_zwidget
   CONFIG = Debug
   DEFINES = -D_MBCS
   FLAGS = /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od -clang:-std=c++23 -MDd -RTC1 -Zi
@@ -68,7 +68,7 @@ build CMakeFiles\zwidget.dir\src\main.cpp.obj: CXX_COMPILER__zwidget_unscanned_D
 #############################################
 # Link the executable D:\Project\zwidgetv2\bin\zwidget.exe
 
-build D$:\Project\zwidgetv2\bin\zwidget.exe: CXX_EXECUTABLE_LINKER__zwidget_Debug CMakeFiles\zwidget.dir\src\main.cpp.obj
+build D$:\Project\zwidgetv2\bin\zwidget.exe: CXX_EXECUTABLE_LINKER__zwidget_Debug CMakeFiles\zwidget.dir\src\test_multi_window.cpp.obj
   CONFIG = Debug
   FLAGS = /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od -MDd -RTC1 -Zi
   LINK_FLAGS = /debug /INCREMENTAL /subsystem:console

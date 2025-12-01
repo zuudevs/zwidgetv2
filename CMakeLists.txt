@@ -9,7 +9,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 include_directories(include)
 
 set(zwidget_sources
-	src/main.cpp
+	src/test_multi_window.cpp
 )
 
 add_executable(${PROJECT_NAME} ${zwidget_sources})

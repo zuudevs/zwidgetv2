@@ -1,3 +1,4 @@
 # ninja log v7
 33	1719	7862585636015698	CMakeFiles/zwidget.dir/src/main.cpp.obj	503c02cd76aaa639
-1720	2041	7862585652897608	D:/Project/zwidgetv2/bin/zwidget.exe	3000b41ad3e799d5
+2678	3368	7862975646789287	D:/Project/zwidgetv2/bin/zwidget.exe	8500044194467a83
+23	2673	7862975620237233	CMakeFiles/zwidget.dir/src/test_multi_window.cpp.obj	40c2ac24df249616
