@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <shared_mutex>
+#include <atomic>
 
 #if defined(max) && defined(min)
     #undef max
@@ -12,10 +14,8 @@
 
 namespace zuu::widget {
 
-    // Forward declarations
     class Window;
     
-    // Window state flags
     enum class WindowState : uint32_t {
         None            = 0,
         Active          = 1 << 0,
@@ -29,7 +29,6 @@ namespace zuu::widget {
         CloseRequested  = 1 << 8,
     };
 
-    // Bitwise operators for WindowState
     constexpr WindowState operator|(WindowState lhs, WindowState rhs) noexcept {
         return static_cast<WindowState>(
             static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs)
@@ -67,25 +66,24 @@ namespace zuu::widget {
         friend LRESULT CALLBACK GlobalWindowProc(HWND, UINT, WPARAM, LPARAM);
 
     private:
-        // Window registry: HWND -> Window*
         static inline std::unordered_map<HWND, Window*> window_registry_{};
+        static inline std::shared_mutex registry_mutex_{};
         
-        // Application state
-        static inline bool is_running_ = true;
-        static inline HINSTANCE hinstance_ = GetModuleHandleW(nullptr);
-        static inline std::string window_class_name_ = "ZWidgetWindowClass";
-        static inline bool class_registered_ = false;
+        static inline std::atomic<bool> is_running_{true};
+        static inline HINSTANCE hinstance_;
+        static inline std::string window_class_name_;
+        static inline std::atomic<bool> class_registered_{false};
 
-        // Register window to registry
         static void register_window(HWND hwnd, Window* window) noexcept {
             if (hwnd && window) {
+                std::unique_lock<std::shared_mutex> lock(registry_mutex_);
                 window_registry_[hwnd] = window;
             }
         }
 
-        // Unregister window from registry
         static void unregister_window(HWND hwnd) noexcept {
             if (hwnd) {
+                std::unique_lock<std::shared_mutex> lock(registry_mutex_);
                 auto it = window_registry_.find(hwnd);
                 if (it != window_registry_.end()) {
                     window_registry_.erase(it);
@@ -93,8 +91,8 @@ namespace zuu::widget {
             }
         }
 
-        // Get window from registry
         static Window* get_window(HWND hwnd) noexcept {
+            std::shared_lock<std::shared_mutex> lock(registry_mutex_);
             auto it = window_registry_.find(hwnd);
             return (it != window_registry_.end()) ? it->second : nullptr;
         }
@@ -107,11 +105,18 @@ namespace zuu::widget {
         Application& operator=(Application&&) = delete;
 
         static bool initialize(const std::string& window_class_name = "ZWidgetWindowClass") {
-            if (class_registered_) {
-                return true; // Already registered
+            // Double-checked locking pattern
+            if (class_registered_.load(std::memory_order_acquire)) {
+                return true;
             }
 
-            window_class_name_ = window_class_name;
+            // Static initialization
+            static bool initialized = false;
+            if (!initialized) {
+                hinstance_ = GetModuleHandleW(nullptr);
+                window_class_name_ = window_class_name;
+                initialized = true;
+            }
 
             WNDCLASSEXA wc = {};
             wc.cbSize = sizeof(WNDCLASSEXA);
@@ -128,36 +133,42 @@ namespace zuu::widget {
                 return false;
             }
 
-            class_registered_ = true;
-            is_running_ = true;
+            class_registered_.store(true, std::memory_order_release);
+            is_running_.store(true, std::memory_order_release);
             return true;
         }
 
         static void shutdown() noexcept {
-            // Collect all window handles
             std::vector<HWND> handles;
-            handles.reserve(window_registry_.size());
-            for (const auto& [hwnd, _] : window_registry_) {
-                handles.push_back(hwnd);
+            {
+                std::shared_lock<std::shared_mutex> lock(registry_mutex_);
+                handles.reserve(window_registry_.size());
+                for (const auto& [hwnd, _] : window_registry_) {
+                    handles.push_back(hwnd);
+                }
             }
 
-            // Destroy all windows
             for (HWND hwnd : handles) {
                 if (IsWindow(hwnd)) {
                     DestroyWindow(hwnd);
                 }
             }
 
-            window_registry_.clear();
-            is_running_ = false;
+            {
+                std::unique_lock<std::shared_mutex> lock(registry_mutex_);
+                window_registry_.clear();
+            }
+            
+            is_running_.store(false, std::memory_order_release);
             PostQuitMessage(0);
         }
 
         static bool is_running() noexcept {
-            return is_running_;
+            return is_running_.load(std::memory_order_acquire);
         }
 
         static size_t window_count() noexcept {
+            std::shared_lock<std::shared_mutex> lock(registry_mutex_);
             return window_registry_.size();
         }
 
@@ -170,7 +181,7 @@ namespace zuu::widget {
         }
 
         static bool is_class_registered() noexcept {
-            return class_registered_;
+            return class_registered_.load(std::memory_order_acquire);
         }
     };
 

@@ -3,13 +3,15 @@
 #include "zwidget/unit/event.hpp"
 #include "event_translater.hpp"
 #include <queue>
+#include <mutex>
 #include <Windows.h>
 
 namespace zuu::widget {
 
     class EventDispatcher {
     private:
-        static inline std::queue<Event> event_queue{};
+        static inline std::queue<Event> event_queue_{};
+        static inline std::mutex queue_mutex_{};
 
     public:
         EventDispatcher() = default;
@@ -20,67 +22,86 @@ namespace zuu::widget {
         ~EventDispatcher() = default;
 
         static void push_event(const Event& event) {
-            event_queue.push(event);
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            event_queue_.push(event);
         }
 
         static bool is_empty() {
-            return event_queue.empty();
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            return event_queue_.empty();
         }
 
         static Event pop_event() {
-            if (event_queue.empty()) {
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            if (event_queue_.empty()) {
                 return Event{};
             }
-            Event event = event_queue.front();
-            event_queue.pop();
+            Event event = event_queue_.front();
+            event_queue_.pop();
             return event;
         }
         
-        static auto size() {
-            return event_queue.size();
+        static size_t size() {
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            return event_queue_.size();
         }
 
         static void clear() {
+            std::lock_guard<std::mutex> lock(queue_mutex_);
             std::queue<Event> empty;
-            std::swap(event_queue, empty);
+            std::swap(event_queue_, empty);
         }
 
         static bool PollEvent(Event& out_event) {
-            if (!event_queue.empty()) {
-                out_event = pop_event();
-                return true;
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                if (!event_queue_.empty()) {
+                    out_event = event_queue_.front();
+                    event_queue_.pop();
+                    return true;
+                }
             }
 
             MSG msg = {};
             while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
                 if (msg.message == WM_QUIT) {
-                    EventDispatcher::push_event(Event::create_quit_event());
-                    out_event = pop_event();
+                    push_event(Event::create_quit_event());
+                    
+                    std::lock_guard<std::mutex> lock(queue_mutex_);
+                    out_event = event_queue_.front();
+                    event_queue_.pop();
                     return true;
                 }
 
                 Event event = detail::CreateEventFromMSG(msg);
                 if (event.get_type() != Event::Type::none) {
-                    EventDispatcher::push_event(event);
+                    push_event(event);
                 }
 
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
 
-            if (!event_queue.empty()) {
-                out_event = pop_event();
-                return true;
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                if (!event_queue_.empty()) {
+                    out_event = event_queue_.front();
+                    event_queue_.pop();
+                    return true;
+                }
             }
 
             return false;
         }
 
         static bool WaitEvent(Event& out_event) {
-            // Jika ada event di queue, langsung return
-            if (!event_queue.empty()) {
-                out_event = pop_event();
-                return true;
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                if (!event_queue_.empty()) {
+                    out_event = event_queue_.front();
+                    event_queue_.pop();
+                    return true;
+                }
             }
             
             MSG msg = {};
@@ -88,23 +109,30 @@ namespace zuu::widget {
             
             if (result > 0) {
                 if (msg.message == WM_QUIT) {
-                    EventDispatcher::push_event(Event::create_quit_event());
-                    out_event = pop_event();
+                    push_event(Event::create_quit_event());
+                    
+                    std::lock_guard<std::mutex> lock(queue_mutex_);
+                    out_event = event_queue_.front();
+                    event_queue_.pop();
                     return true;
                 }
 
                 Event event = detail::CreateEventFromMSG(msg);
                 if (event.get_type() != Event::Type::none) {
-                    EventDispatcher::push_event(event);
+                    push_event(event);
                 }
 
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
+                
                 return PollEvent(out_event);
             } 
             else if (result == 0) {
-                EventDispatcher::push_event(Event::create_quit_event());
-                out_event = pop_event();
+                push_event(Event::create_quit_event());
+                
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                out_event = event_queue_.front();
+                event_queue_.pop();
                 return true;
             }
             

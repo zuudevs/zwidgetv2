@@ -6,11 +6,11 @@
 #include "zwidget/unit/size.hpp"
 #include "zwidget/unit/rect.hpp"
 #include <string>
+#include <atomic>
 #include <Windows.h>
 
 namespace zuu::widget {
 
-    // Window styles enum for convenience
     enum class WindowStyle : DWORD {
         Default         = WS_OVERLAPPEDWINDOW,
         Overlapped      = WS_OVERLAPPEDWINDOW,
@@ -29,18 +29,18 @@ namespace zuu::widget {
 
     private:
         HWND hwnd_ = nullptr;
-        WindowState state_ = WindowState::None;
+        std::atomic<uint32_t> state_{0};
         std::string title_;
 
         void internal_destroy() noexcept {
-            if (has_state(state_, WindowState::Destroyed)) {
+            if (has_state_flag(WindowState::Destroyed)) {
                 return;
             }
 
-            if (has_state(state_, WindowState::Registered)) {
+            if (has_state_flag(WindowState::Registered)) {
                 Application::unregister_window(hwnd_);
-                state_ &= ~WindowState::Registered;
-                state_ |= WindowState::Unregistered;
+                clear_state_flag(WindowState::Registered);
+                set_state_flag(WindowState::Unregistered);
             }
 
             if (hwnd_ && IsWindow(hwnd_)) {
@@ -48,7 +48,37 @@ namespace zuu::widget {
             }
 
             hwnd_ = nullptr;
-            state_ |= WindowState::Destroyed;
+            set_state_flag(WindowState::Destroyed);
+        }
+
+        // Thread-safe state operations
+        void set_state_flag(WindowState flag) noexcept {
+            uint32_t current = state_.load(std::memory_order_relaxed);
+            uint32_t desired;
+            do {
+                desired = current | static_cast<uint32_t>(flag);
+            } while (!state_.compare_exchange_weak(
+                current, desired,
+                std::memory_order_release,
+                std::memory_order_relaxed
+            ));
+        }
+
+        void clear_state_flag(WindowState flag) noexcept {
+            uint32_t current = state_.load(std::memory_order_relaxed);
+            uint32_t desired;
+            do {
+                desired = current & ~static_cast<uint32_t>(flag);
+            } while (!state_.compare_exchange_weak(
+                current, desired,
+                std::memory_order_release,
+                std::memory_order_relaxed
+            ));
+        }
+
+        bool has_state_flag(WindowState flag) const noexcept {
+            uint32_t current = state_.load(std::memory_order_acquire);
+            return (current & static_cast<uint32_t>(flag)) != 0;
         }
 
     public:
@@ -60,8 +90,7 @@ namespace zuu::widget {
             const std::string& title,
             const basic_size<int>& size,
             WindowStyle style = WindowStyle::Default
-        ) : title_(title) {
-            // Ensure Application is initialized
+        ) : title_(title), state_(0) {
             if (!Application::is_class_registered()) {
                 Application::initialize();
             }
@@ -85,9 +114,9 @@ namespace zuu::widget {
                 throw std::runtime_error("Failed to create window");
             }
 
-            state_ = WindowState::Active;
+            set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
-            state_ |= WindowState::Registered;
+            set_state_flag(WindowState::Registered);
         }
 
         Window(
@@ -95,7 +124,7 @@ namespace zuu::widget {
             const basic_point<int>& position,
             const basic_size<int>& size,
             WindowStyle style = WindowStyle::Default
-        ) : title_(title) {
+        ) : title_(title), state_(0) {
             if (!Application::is_class_registered()) {
                 Application::initialize();
             }
@@ -119,16 +148,16 @@ namespace zuu::widget {
                 throw std::runtime_error("Failed to create window");
             }
 
-            state_ = WindowState::Active;
+            set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
-            state_ |= WindowState::Registered;
+            set_state_flag(WindowState::Registered);
         }
 
         Window(
             const std::string& title,
             const basic_rect<int>& rect,
             WindowStyle style = WindowStyle::Default
-        ) : title_(title) {
+        ) : title_(title), state_(0) {
             if (!Application::is_class_registered()) {
                 Application::initialize();
             }
@@ -152,14 +181,14 @@ namespace zuu::widget {
                 throw std::runtime_error("Failed to create window");
             }
 
-            state_ = WindowState::Active;
+            set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
-            state_ |= WindowState::Registered;
+            set_state_flag(WindowState::Registered);
         }
 
         Window(Window&& other) noexcept
             : hwnd_(std::exchange(other.hwnd_, nullptr))
-            , state_(std::exchange(other.state_, WindowState::None))
+            , state_(other.state_.exchange(0, std::memory_order_acq_rel))
             , title_(std::move(other.title_)) {
             
             if (hwnd_) {
@@ -173,7 +202,8 @@ namespace zuu::widget {
                 internal_destroy();
 
                 hwnd_ = std::exchange(other.hwnd_, nullptr);
-                state_ = std::exchange(other.state_, WindowState::None);
+                state_.store(other.state_.exchange(0, std::memory_order_acq_rel), 
+                           std::memory_order_release);
                 title_ = std::move(other.title_);
 
                 if (hwnd_) {
@@ -192,38 +222,38 @@ namespace zuu::widget {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_SHOW);
                 UpdateWindow(hwnd_);
-                state_ |= WindowState::Visible;
+                set_state_flag(WindowState::Visible);
             }
         }
 
         void hide() noexcept {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_HIDE);
-                state_ &= ~WindowState::Visible;
+                clear_state_flag(WindowState::Visible);
             }
         }
 
         void minimize() noexcept {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_MINIMIZE);
-                state_ |= WindowState::Minimized;
-                state_ &= ~WindowState::Maximized;
+                set_state_flag(WindowState::Minimized);
+                clear_state_flag(WindowState::Maximized);
             }
         }
 
         void maximize() noexcept {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_MAXIMIZE);
-                state_ |= WindowState::Maximized;
-                state_ &= ~WindowState::Minimized;
+                set_state_flag(WindowState::Maximized);
+                clear_state_flag(WindowState::Minimized);
             }
         }
 
         void restore() noexcept {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_RESTORE);
-                state_ &= ~WindowState::Minimized;
-                state_ &= ~WindowState::Maximized;
+                clear_state_flag(WindowState::Minimized);
+                clear_state_flag(WindowState::Maximized);
             }
         }
 
@@ -267,6 +297,7 @@ namespace zuu::widget {
             }
         }
 
+        // Property getters
         HWND get_handle() const noexcept {
             return hwnd_;
         }
@@ -276,7 +307,7 @@ namespace zuu::widget {
         }
 
         WindowState get_state() const noexcept {
-            return state_;
+            return static_cast<WindowState>(state_.load(std::memory_order_acquire));
         }
 
         basic_size<int> get_size() const noexcept {
@@ -321,7 +352,7 @@ namespace zuu::widget {
         }
 
         bool is_valid() const noexcept {
-            return hwnd_ && !has_state(state_, WindowState::Destroyed);
+            return hwnd_ && !has_state_flag(WindowState::Destroyed);
         }
 
         bool is_visible() const noexcept {
@@ -341,7 +372,7 @@ namespace zuu::widget {
         }
 
         bool is_close_requested() const noexcept {
-            return has_state(state_, WindowState::CloseRequested);
+            return has_state_flag(WindowState::CloseRequested);
         }
     };
 
@@ -351,7 +382,7 @@ namespace zuu::widget {
         switch (msg) {
             case WM_CLOSE: {
                 if (window) {
-                    window->state_ |= WindowState::CloseRequested;
+                    window->set_state_flag(WindowState::CloseRequested);
                 }
 
                 Event event = Event::create_window_event(
@@ -366,9 +397,8 @@ namespace zuu::widget {
             case WM_DESTROY: {
                 Application::unregister_window(hwnd);
 
-                // If no more windows, quit application
                 if (Application::window_count() == 0) {
-                    Application::is_running_ = false;
+                    Application::is_running_.store(false, std::memory_order_release);
                     PostQuitMessage(0);
                 }
                 return 0;
@@ -379,18 +409,18 @@ namespace zuu::widget {
                 switch (wParam) {
                     case SIZE_MINIMIZED:
                         type = WindowEvent::Type::minimize;
-                        if (window) window->state_ |= WindowState::Minimized;
+                        if (window) window->set_state_flag(WindowState::Minimized);
                         break;
                     case SIZE_MAXIMIZED:
                         type = WindowEvent::Type::maximize;
-                        if (window) window->state_ |= WindowState::Maximized;
+                        if (window) window->set_state_flag(WindowState::Maximized);
                         break;
                     case SIZE_RESTORED:
                     default:
                         type = WindowEvent::Type::restored;
                         if (window) {
-                            window->state_ &= ~WindowState::Minimized;
-                            window->state_ &= ~WindowState::Maximized;
+                            window->clear_state_flag(WindowState::Minimized);
+                            window->clear_state_flag(WindowState::Maximized);
                         }
                         break;
                 }
@@ -411,7 +441,7 @@ namespace zuu::widget {
 
             case WM_SETFOCUS: {
                 if (window) {
-                    window->state_ |= WindowState::Focused;
+                    window->set_state_flag(WindowState::Focused);
                 }
 
                 Event event = Event::create_window_event(
@@ -424,7 +454,7 @@ namespace zuu::widget {
 
             case WM_KILLFOCUS: {
                 if (window) {
-                    window->state_ &= ~WindowState::Focused;
+                    window->clear_state_flag(WindowState::Focused);
                 }
 
                 Event event = Event::create_window_event(
@@ -435,7 +465,6 @@ namespace zuu::widget {
                 break;
             }
 
-            // Mouse events
             case WM_MOUSEMOVE:
             case WM_LBUTTONDOWN:
             case WM_LBUTTONUP:
@@ -454,7 +483,6 @@ namespace zuu::widget {
                 break;
             }
 
-            // Keyboard events
             case WM_KEYDOWN:
             case WM_KEYUP:
             case WM_SYSKEYDOWN:
