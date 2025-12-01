@@ -1,0 +1,3 @@
+D:/Project/zwidgetv2/build/CMakeFiles/zwidget.dir
+D:/Project/zwidgetv2/build/CMakeFiles/edit_cache.dir
+D:/Project/zwidgetv2/build/CMakeFiles/rebuild_cache.dir

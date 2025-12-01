@@ -1,0 +1,8 @@
+[
+{
+  "directory": "D:/Project/zwidgetv2/build",
+  "command": "D:\\dev-tools\\LLVM\\bin\\clang-cl.exe  /nologo -TP -D_MBCS -ID:\\Project\\zwidgetv2\\include /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od -clang:-std=c++23 -MDd -RTC1 -Zi /FoCMakeFiles\\zwidget.dir\\src\\main.cpp.obj /FdCMakeFiles\\zwidget.dir\\ -c -- D:\\Project\\zwidgetv2\\src\\main.cpp",
+  "file": "D:/Project/zwidgetv2/src/main.cpp",
+  "output": "D:/Project/zwidgetv2/build/CMakeFiles/zwidget.dir/src/main.cpp.obj"
+}
+]
