@@ -1,7 +1,4 @@
 # ninja log v7
-3122	3448	7863714274262574	D:/Project/zwidgetv2/bin/zwidget.exe	7640e0bf583c1fa7
-17	2768	7863702022113180	CMakeFiles/zwidget.dir/src/test_basic_shape.cpp.obj	a13137c6c2f0530a
-4	2580	7863703211892158	CMakeFiles/zwidget.dir/src/test_multi_window.cpp.obj	e6b2bca25398ab6f
-4	3118	7863714243086443	CMakeFiles/zwidget.dir/src/test_widget.cpp.obj	d9a248179732561d
-4	3306	7863725777533702	CMakeFiles/zwidget.dir/src/test_comprehensive_widgets.cpp.obj	cbe9b8686202c4d1
 3314	3831	7863725810632343	D:/Project/zwidgetv2/bin/zwidget.exe	587d9d0171fbb440
+3	3809	7863740600622624	CMakeFiles/zwidget.dir/src/test_all_widget.cpp.obj	708a81d22d587b1d
+3813	4337	7863740638653998	D:/Project/zwidgetv2/bin/zwidget.exe	14a74754debc69c2

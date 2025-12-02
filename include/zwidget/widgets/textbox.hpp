@@ -15,9 +15,11 @@ namespace zuu::widget {
         bool is_password_{false};
         wchar_t password_char_{L'•'};
         size_t max_length_{1024};
+        bool read_only_{false};
         
         float cursor_blink_time_{0.0f};
         bool cursor_visible_{true};
+        float scroll_offset_{0.0f};  // For horizontal scrolling
         
         Color background_normal_{Color::from_hex(0x3a3a3a)};
         Color background_focused_{Color::from_hex(0x454545)};
@@ -39,7 +41,7 @@ namespace zuu::widget {
             
             text_.erase(start, end - start);
             cursor_position_ = start;
-            selection_start_ = selection_end_ = 0;
+            clear_selection();
             
             if (on_text_changed_) {
                 on_text_changed_(this, text_);
@@ -49,12 +51,68 @@ namespace zuu::widget {
         bool has_selection() const {
             return selection_start_ != selection_end_;
         }
+        
+        void clear_selection() {
+            selection_start_ = selection_end_ = 0;
+        }
+        
+        void select_all() {
+            selection_start_ = 0;
+            selection_end_ = text_.length();
+            cursor_position_ = text_.length();
+        }
 
         std::wstring get_display_text() const {
             if (is_password_ && !text_.empty()) {
                 return std::wstring(text_.length(), password_char_);
             }
             return text_;
+        }
+        
+        // Improved character input handling
+        void insert_character(wchar_t ch) {
+            if (read_only_ || text_.length() >= max_length_) return;
+            
+            if (has_selection()) {
+                delete_selection();
+            }
+            
+            text_.insert(cursor_position_, 1, ch);
+            cursor_position_++;
+            
+            if (on_text_changed_) {
+                on_text_changed_(this, text_);
+            }
+        }
+        
+        // Convert VK code to character with shift state
+        wchar_t vk_to_char(KeyboardEvent::KeyCode key, bool shift) {
+            // Get the virtual key code
+            UINT vk = static_cast<UINT>(key);
+            
+            // Get keyboard state
+            BYTE keyboard_state[256] = {0};
+            if (shift) {
+                keyboard_state[VK_SHIFT] = 0x80;
+            }
+            
+            // Translate to character
+            wchar_t buffer[2] = {0};
+            int result = ToUnicode(vk, 0, keyboard_state, buffer, 2, 0);
+            
+            if (result == 1) {
+                return buffer[0];
+            }
+            
+            return 0;
+        }
+        
+        bool is_shift_pressed() const {
+            return (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        }
+        
+        bool is_ctrl_pressed() const {
+            return (GetKeyState(VK_CONTROL) & 0x8000) != 0;
         }
 
     public:
@@ -70,27 +128,18 @@ namespace zuu::widget {
         void render(Renderer& renderer) override {
             if (!is_visible()) return;
 
-            // Determine background color
+            // Background
             Color bg = is_focused() ? background_focused_ : background_normal_;
             
-            // Draw background
             if (style_.border_radius > 0) {
-                renderer.fill_rounded_rect(
-                    bounds_,
-                    style_.border_radius,
-                    style_.border_radius,
-                    bg
-                );
+                renderer.fill_rounded_rect(bounds_, style_.border_radius, style_.border_radius, bg);
             } else {
                 renderer.fill_rect(bounds_, bg);
             }
 
-            // Draw border
-            Color border = style_.border_color;
-            if (is_focused()) {
-                border = Color::from_hex(0x4a90e2);
-            }
-
+            // Border
+            Color border = is_focused() ? Color::from_hex(0x4a90e2) : style_.border_color;
+            
             if (style_.border_radius > 0) {
                 renderer.draw_rounded_rect(
                     bounds_,
@@ -111,13 +160,14 @@ namespace zuu::widget {
                 size_t start = std::min(selection_start_, selection_end_);
                 size_t end = std::max(selection_start_, selection_end_);
                 
-                // Simplified selection rendering (full height)
-                float sel_x = content_bounds_.x + start * 8.0f; // Rough estimate
-                float sel_w = (end - start) * 8.0f;
+                // Rough character width estimation (should use proper text measurement)
+                float char_width = 8.0f;
+                float sel_x = content_bounds_.x + start * char_width - scroll_offset_;
+                float sel_w = (end - start) * char_width;
                 
                 renderer.fill_rect(
                     basic_rect<float>(sel_x, content_bounds_.y, sel_w, content_bounds_.h),
-                    selection_color_
+                    Color(selection_color_.r(), selection_color_.g(), selection_color_.b(), 0.3f)
                 );
             }
 
@@ -131,12 +181,23 @@ namespace zuu::widget {
                     Color(0.5f, 0.5f, 0.5f, 0.7f)
                 );
             } else if (!display_text.empty()) {
-                renderer.draw_text(display_text, content_bounds_, style_.text_color);
+                // Apply scroll offset for horizontal scrolling
+                auto text_rect = content_bounds_;
+                text_rect.x -= scroll_offset_;
+                renderer.draw_text(display_text, text_rect, style_.text_color);
             }
 
             // Draw cursor
             if (is_focused() && cursor_visible_ && !has_selection()) {
-                float cursor_x = content_bounds_.x + cursor_position_ * 8.0f; // Rough
+                float char_width = 8.0f;
+                float cursor_x = content_bounds_.x + cursor_position_ * char_width - scroll_offset_;
+                
+                // Auto-scroll to keep cursor visible
+                if (cursor_x < content_bounds_.x) {
+                    scroll_offset_ -= (content_bounds_.x - cursor_x);
+                } else if (cursor_x > content_bounds_.x + content_bounds_.w) {
+                    scroll_offset_ += (cursor_x - (content_bounds_.x + content_bounds_.w));
+                }
                 
                 renderer.draw_line(
                     basic_point<float>(cursor_x, content_bounds_.y + 2),
@@ -147,7 +208,6 @@ namespace zuu::widget {
             }
 
             renderer.pop_clip();
-
             set_flag(WidgetFlag::Dirty, false);
         }
 
@@ -168,10 +228,17 @@ namespace zuu::widget {
             if (!is_enabled()) return false;
 
             if (event.get_button() == MouseEvent::Button::left) {
-                // TODO: Calculate actual cursor position from mouse click
-                // For now, just set to end
-                cursor_position_ = text_.length();
-                selection_start_ = selection_end_ = 0;
+                // TODO: Calculate actual cursor position from click
+                // For now, simple implementation
+                float char_width = 8.0f;
+                float click_x = static_cast<float>(event.get_position().x) - content_bounds_.x + scroll_offset_;
+                cursor_position_ = static_cast<size_t>(std::max(0.0f, click_x / char_width));
+                clamp_cursor();
+                
+                if (!is_shift_pressed()) {
+                    clear_selection();
+                }
+                
                 mark_dirty();
                 return true;
             }
@@ -184,60 +251,111 @@ namespace zuu::widget {
 
             bool handled = false;
             auto key = event.get_key();
+            bool shift = is_shift_pressed();
+            bool ctrl = is_ctrl_pressed();
 
-            // Handle control keys
-            if (key == KeyboardEvent::KeyCode::Left) {
-                if (cursor_position_ > 0) {
-                    cursor_position_--;
-                    clamp_cursor();
-                    cursor_blink_time_ = 0.0f;
-                    cursor_visible_ = true;
+            // Handle Ctrl shortcuts
+            if (ctrl) {
+                if (key == KeyboardEvent::KeyCode::A) {
+                    select_all();
                     handled = true;
                 }
+                else if (key == KeyboardEvent::KeyCode::C) {
+                    // TODO: Copy to clipboard
+                    handled = true;
+                }
+                else if (key == KeyboardEvent::KeyCode::V) {
+                    // TODO: Paste from clipboard
+                    handled = true;
+                }
+                else if (key == KeyboardEvent::KeyCode::X) {
+                    // TODO: Cut to clipboard
+                    handled = true;
+                }
+            }
+            // Navigation keys
+            else if (key == KeyboardEvent::KeyCode::Left) {
+                if (cursor_position_ > 0) {
+                    if (shift && !has_selection()) {
+                        selection_start_ = cursor_position_;
+                    }
+                    cursor_position_--;
+                    if (shift) {
+                        selection_end_ = cursor_position_;
+                    } else {
+                        clear_selection();
+                    }
+                }
+                cursor_blink_time_ = 0.0f;
+                cursor_visible_ = true;
+                handled = true;
             }
             else if (key == KeyboardEvent::KeyCode::Right) {
                 if (cursor_position_ < text_.length()) {
+                    if (shift && !has_selection()) {
+                        selection_start_ = cursor_position_;
+                    }
                     cursor_position_++;
-                    clamp_cursor();
-                    cursor_blink_time_ = 0.0f;
-                    cursor_visible_ = true;
-                    handled = true;
+                    if (shift) {
+                        selection_end_ = cursor_position_;
+                    } else {
+                        clear_selection();
+                    }
                 }
-            }
-            else if (key == KeyboardEvent::KeyCode::Home) {
-                cursor_position_ = 0;
                 cursor_blink_time_ = 0.0f;
                 cursor_visible_ = true;
+                handled = true;
+            }
+            else if (key == KeyboardEvent::KeyCode::Home) {
+                if (shift && !has_selection()) {
+                    selection_start_ = cursor_position_;
+                }
+                cursor_position_ = 0;
+                if (shift) {
+                    selection_end_ = cursor_position_;
+                } else {
+                    clear_selection();
+                }
                 handled = true;
             }
             else if (key == KeyboardEvent::KeyCode::End) {
+                if (shift && !has_selection()) {
+                    selection_start_ = cursor_position_;
+                }
                 cursor_position_ = text_.length();
-                cursor_blink_time_ = 0.0f;
-                cursor_visible_ = true;
+                if (shift) {
+                    selection_end_ = cursor_position_;
+                } else {
+                    clear_selection();
+                }
                 handled = true;
             }
             else if (key == KeyboardEvent::KeyCode::Back) {
-                if (has_selection()) {
-                    delete_selection();
-                } else if (cursor_position_ > 0) {
-                    text_.erase(cursor_position_ - 1, 1);
-                    cursor_position_--;
-                    if (on_text_changed_) {
-                        on_text_changed_(this, text_);
+                if (!read_only_) {
+                    if (has_selection()) {
+                        delete_selection();
+                    } else if (cursor_position_ > 0) {
+                        text_.erase(cursor_position_ - 1, 1);
+                        cursor_position_--;
+                        if (on_text_changed_) {
+                            on_text_changed_(this, text_);
+                        }
                     }
+                    handled = true;
                 }
-                handled = true;
             }
             else if (key == KeyboardEvent::KeyCode::Delete) {
-                if (has_selection()) {
-                    delete_selection();
-                } else if (cursor_position_ < text_.length()) {
-                    text_.erase(cursor_position_, 1);
-                    if (on_text_changed_) {
-                        on_text_changed_(this, text_);
+                if (!read_only_) {
+                    if (has_selection()) {
+                        delete_selection();
+                    } else if (cursor_position_ < text_.length()) {
+                        text_.erase(cursor_position_, 1);
+                        if (on_text_changed_) {
+                            on_text_changed_(this, text_);
+                        }
                     }
+                    handled = true;
                 }
-                handled = true;
             }
             else if (key == KeyboardEvent::KeyCode::Enter) {
                 if (on_enter_pressed_) {
@@ -245,23 +363,13 @@ namespace zuu::widget {
                 }
                 handled = true;
             }
-            else if (key >= KeyboardEvent::KeyCode::Space && 
-                     key <= KeyboardEvent::KeyCode::Z) {
-                // Character input
-                if (text_.length() < max_length_) {
-                    if (has_selection()) {
-                        delete_selection();
-                    }
-                    
-                    wchar_t ch = static_cast<wchar_t>(key);
-                    text_.insert(cursor_position_, 1, ch);
-                    cursor_position_++;
-                    
-                    if (on_text_changed_) {
-                        on_text_changed_(this, text_);
-                    }
+            // Character input - use proper conversion
+            else if (!read_only_) {
+                wchar_t ch = vk_to_char(key, shift);
+                if (ch != 0 && ch >= 32) {  // Printable character
+                    insert_character(ch);
+                    handled = true;
                 }
-                handled = true;
             }
 
             if (handled) {
@@ -274,10 +382,10 @@ namespace zuu::widget {
         // Setters
         void set_text(const std::wstring& text) {
             if (text_ != text) {
-                text_ = text;
+                text_ = text.substr(0, max_length_);
                 cursor_position_ = text_.length();
                 clamp_cursor();
-                selection_start_ = selection_end_ = 0;
+                clear_selection();
                 mark_dirty();
                 
                 if (on_text_changed_) {
@@ -308,6 +416,10 @@ namespace zuu::widget {
                 mark_dirty();
             }
         }
+        
+        void set_read_only(bool read_only) {
+            read_only_ = read_only;
+        }
 
         void on_text_changed(std::function<void(TextBox*, const std::wstring&)> callback) {
             on_text_changed_ = std::move(callback);
@@ -318,17 +430,10 @@ namespace zuu::widget {
         }
 
         // Getters
-        const std::wstring& get_text() const noexcept {
-            return text_;
-        }
-
-        bool is_password_mode() const noexcept {
-            return is_password_;
-        }
-
-        size_t get_max_length() const noexcept {
-            return max_length_;
-        }
+        const std::wstring& get_text() const noexcept { return text_; }
+        bool is_password_mode() const noexcept { return is_password_; }
+        size_t get_max_length() const noexcept { return max_length_; }
+        bool is_read_only() const noexcept { return read_only_; }
     };
 
 } // namespace zuu::widget
