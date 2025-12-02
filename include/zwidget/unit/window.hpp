@@ -3,8 +3,6 @@
 #include "zwidget/core/application.hpp"
 #include "zwidget/core/event_dispatcher.hpp"
 #include "zwidget/graphic/renderer.hpp"
-#include "zwidget/unit/point.hpp"
-#include "zwidget/unit/size.hpp"
 #include "zwidget/unit/rect.hpp"
 #include <string>
 #include <atomic>
@@ -217,8 +215,10 @@ namespace zuu::widget {
             );
 
             if (!hwnd_) {
-                throw std::runtime_error("Failed to create window");
-            }
+				DWORD error = GetLastError();
+				std::string msg = "Failed to create window. Error code: " + std::to_string(error);
+				throw std::runtime_error(msg);
+			}
 
             set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
@@ -417,6 +417,14 @@ namespace zuu::widget {
             return basic_rect<int>(0, 0, 0, 0);
         }
 
+		WindowState get_state_flags() const noexcept {
+			return static_cast<WindowState>(state_.load(std::memory_order_acquire));
+		}
+
+		bool has_any_state(WindowState flags) const noexcept {
+			return has_state_flag(flags);
+		}
+
         bool is_valid() const noexcept {
             return hwnd_ && !has_state_flag(WindowState::Destroyed);
         }
@@ -455,9 +463,12 @@ namespace zuu::widget {
 
             case WM_SIZE: {
                 if (window && wParam != SIZE_MINIMIZED) {
-                    auto new_size = basic_size<int>(LOWORD(lParam), HIWORD(lParam));
-                    window->renderer_.resize(new_size);
-                }
+					auto new_size = basic_size<int>(LOWORD(lParam), HIWORD(lParam));
+					if (window->renderer_.is_initialized()) {
+						window->renderer_.resize(new_size);
+						window->invalidate();  // Force redraw after resize
+					}
+				}
 
                 WindowEvent::Type type;
                 switch (wParam) {

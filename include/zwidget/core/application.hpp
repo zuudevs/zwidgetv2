@@ -94,10 +94,10 @@ namespace zuu::widget {
         }
 
         static Window* get_window(HWND hwnd) noexcept {
-            std::shared_lock<std::shared_mutex> lock(registry_mutex_);
-            auto it = window_registry_.find(hwnd);
-            return (it != window_registry_.end()) ? it->second : nullptr;
-        }
+			std::shared_lock<std::shared_mutex> lock(registry_mutex_);
+			auto it = window_registry_.find(hwnd);
+			return (it != window_registry_.end()) ? it->second : nullptr;
+		}
 
     public:
         Application() = delete;

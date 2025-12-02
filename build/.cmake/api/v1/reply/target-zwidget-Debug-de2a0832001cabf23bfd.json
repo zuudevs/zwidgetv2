@@ -182,7 +182,7 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "src/test_multi_window.cpp",
+			"path" : "src/test_comprehensive_widgets.cpp",
 			"sourceGroupIndex" : 0
 		}
 	],

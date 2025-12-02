@@ -98,51 +98,54 @@ namespace zuu::widget {
         }
 
         static bool WaitEvent(Event& out_event) {
-            {
-                std::lock_guard<std::mutex> lock(queue_mutex_);
-                if (!event_queue_.empty()) {
-                    out_event = event_queue_.front();
-                    event_queue_.pop();
-                    return true;
-                }
-            }
-            
-            MSG msg = {};
-            BOOL result = GetMessage(&msg, nullptr, 0, 0);
-            
-            if (result > 0) {
-                if (msg.message == WM_QUIT) {
-                    push_event(Event::create_quit_event());
-                    
-                    std::lock_guard<std::mutex> lock(queue_mutex_);
-                    out_event = event_queue_.front();
-                    event_queue_.pop();
-                    return true;
-                }
+			{
+				std::lock_guard<std::mutex> lock(queue_mutex_);
+				if (!event_queue_.empty()) {
+					out_event = event_queue_.front();
+					event_queue_.pop();
+					return true;
+				}
+			}
+			
+			MSG msg = {};
+			BOOL result = GetMessage(&msg, nullptr, 0, 0);
+			
+			if (result > 0) {
+				if (msg.message == WM_QUIT) {
+					push_event(Event::create_quit_event());
+					
+					std::lock_guard<std::mutex> lock(queue_mutex_);
+					out_event = event_queue_.front();
+					event_queue_.pop();
+					return true;
+				}
 
-                // Get Window from HWND
-                Window* window = Application::get_window(msg.hwnd);
-                Event event = detail::CreateEventFromMSG(window, msg);
-                if (event.get_type() != Event::Type::none) {
-                    push_event(event);
-                }
+				Window* window = Application::get_window(msg.hwnd);
+				Event event = detail::CreateEventFromMSG(window, msg);
+				if (event.get_type() != Event::Type::none) {
+					push_event(event);
+				}
 
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-                
-                return PollEvent(out_event);
-            } 
-            else if (result == 0) {
-                push_event(Event::create_quit_event());
-                
-                std::lock_guard<std::mutex> lock(queue_mutex_);
-                out_event = event_queue_.front();
-                event_queue_.pop();
-                return true;
-            }
-            
-            return false;
-        }
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+				
+				return PollEvent(out_event);
+			} 
+			else if (result == 0) {
+				push_event(Event::create_quit_event());
+				
+				std::lock_guard<std::mutex> lock(queue_mutex_);
+				out_event = event_queue_.front();
+				event_queue_.pop();
+				return true;
+			}
+			else {
+				// result == -1: Error occurred
+				DWORD error = GetLastError();
+				// Log error or handle it appropriately
+				return false;
+			}
+		}
     };
 
 } // namespace zuu::widget

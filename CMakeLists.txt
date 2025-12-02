@@ -12,7 +12,7 @@ include_directories(include)
 
 # Source files
 set(zwidget_sources
-    src/test_multi_window.cpp
+    src/test_comprehensive_widgets.cpp
 )
 
 # 1. Define Executable dulu

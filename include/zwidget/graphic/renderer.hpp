@@ -24,6 +24,7 @@ namespace zuu::widget {
     public:
         void mark_dirty(const basic_rect<int>& region) {
             if (is_full_dirty_) return;
+			if (region.w <= 0 || region.h <= 0) return;
 
             // Merge overlapping regions untuk optimisasi
             bool merged = false;
@@ -268,34 +269,51 @@ namespace zuu::widget {
             return false;
         }
 
-        // Render with partial redraw optimization
-        template<typename DrawFunc>
-        bool render(DrawFunc&& draw_func) {
-            if (!needs_redraw()) return true;
+        bool recreate_device_resources(const basic_size<int>& size) {
+			cleanup_device_resources();
+			return initialize(hwnd_, size);
+		}
 
-            if (!begin_draw()) return false;
+		// Modify render function
+		template<typename DrawFunc>
+		bool render(DrawFunc&& draw_func) {
+			if (!needs_redraw()) return true;
 
-            if (dirty_tracker_.is_full_dirty()) {
-                // Full redraw
-                draw_func(*this);
-            } else {
-                // Partial redraw dengan clipping
-                for (const auto& region : dirty_tracker_.get_regions()) {
-                    push_clip(basic_rect<float>(
-                        static_cast<float>(region.x),
-                        static_cast<float>(region.y),
-                        static_cast<float>(region.w),
-                        static_cast<float>(region.h)
-                    ));
-                    
-                    draw_func(*this);
-                    
-                    pop_clip();
-                }
-            }
+			if (!begin_draw()) return false;
 
-            return end_draw();
-        }
+			if (dirty_tracker_.is_full_dirty()) {
+				draw_func(*this);
+			} else {
+				for (const auto& region : dirty_tracker_.get_regions()) {
+					push_clip(basic_rect<float>(
+						static_cast<float>(region.x),
+						static_cast<float>(region.y),
+						static_cast<float>(region.w),
+						static_cast<float>(region.h)
+					));
+					
+					draw_func(*this);
+					
+					pop_clip();
+				}
+			}
+
+			bool success = end_draw();
+			
+			// If device was lost, try to recreate
+			if (!success && hwnd_) {
+				RECT rect;
+				GetClientRect(hwnd_, &rect);
+				basic_size<int> size(rect.right - rect.left, rect.bottom - rect.top);
+				
+				if (recreate_device_resources(size)) {
+					dirty_tracker_.mark_full_dirty();
+					return false; // Needs another render pass
+				}
+			}
+			
+			return success;
+		}
 
         // Text format management
         IDWriteTextFormat* get_default_text_format() const noexcept {
