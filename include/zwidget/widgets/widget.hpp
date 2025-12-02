@@ -3,8 +3,6 @@
 #include "zwidget/unit/rect.hpp"
 #include "zwidget/unit/event.hpp"
 #include "zwidget/graphic/renderer.hpp"
-#include <memory>
-#include <vector>
 #include <string>
 #include <functional>
 
@@ -43,7 +41,7 @@ namespace zuu::widget {
     struct WidgetStyle {
         Color background_color{Color::Transparent()};
         Color border_color{Color::Gray()};
-        Color text_color{Color::White()};
+        Color text_color{Color::from_hex(0xecf0f1)}; // Off-white untuk kontras baik
         
         float border_width{1.0f};
         float border_radius{0.0f};

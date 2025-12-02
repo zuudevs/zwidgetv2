@@ -1,4 +1,9 @@
 # ninja log v7
-3314	3831	7863725810632343	D:/Project/zwidgetv2/bin/zwidget.exe	587d9d0171fbb440
-3	3809	7863740600622624	CMakeFiles/zwidget.dir/src/test_all_widget.cpp.obj	708a81d22d587b1d
-3813	4337	7863740638653998	D:/Project/zwidgetv2/bin/zwidget.exe	14a74754debc69c2
+3422	3746	7863761253017797	D:/Project/zwidgetv2/bin/zwidget.exe	14a74754debc69c2
+3	3421	7863761218828718	CMakeFiles/zwidget.dir/src/test_all_widget.cpp.obj	708a81d22d587b1d
+15	2825	7863831739147946	CMakeFiles/zwidget.dir/src/test_keyboard.cpp.obj	3237a335bfb6e0ba
+2829	3594	7863831767280605	D:/Project/zwidgetv2/bin/zwidget.exe	38a2afe456075022
+58	2687	7863832568593182	CMakeFiles/zwidget.dir/src/test_keyboard.cpp.obj	3237a335bfb6e0ba
+2688	2993	7863832594898313	D:/Project/zwidgetv2/bin/zwidget.exe	38a2afe456075022
+28	2637	7863833166752546	CMakeFiles/zwidget.dir/src/test_keyboard.cpp.obj	3237a335bfb6e0ba
+2637	2901	7863833192835128	D:/Project/zwidgetv2/bin/zwidget.exe	38a2afe456075022

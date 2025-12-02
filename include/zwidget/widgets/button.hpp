@@ -1,8 +1,6 @@
 #pragma once
 
 #include "widget.hpp"
-#include <string>
-#include <functional>
 
 namespace zuu::widget {
 

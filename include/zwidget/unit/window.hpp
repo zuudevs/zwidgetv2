@@ -505,18 +505,20 @@ namespace zuu::widget {
             }
 
             case WM_CLOSE: {
-                if (window) {
-                    window->set_state_flag(WindowState::CloseRequested);
-                }
-
-                Event event = Event::create_window_event(
-                    window,
-                    WindowEvent(WindowEvent::Type::close)
-                );
-                EventDispatcher::push_event(event);
-                
-                return 0;
-            }
+				if (window) {
+					window->set_state_flag(WindowState::CloseRequested);
+					
+					Event event = Event::create_window_event(
+						window,
+						WindowEvent(WindowEvent::Type::close)
+					);
+					EventDispatcher::push_event(event);
+				}
+				
+				// PERBAIKAN: Destroy window secara langsung
+				DestroyWindow(hwnd);
+				return 0;
+			}
 
             case WM_DESTROY: {
                 Application::unregister_window(hwnd);

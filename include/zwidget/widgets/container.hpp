@@ -2,6 +2,7 @@
 
 #include "widget.hpp"
 #include <algorithm>
+#include <memory>
 
 namespace zuu::widget {
 

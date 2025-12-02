@@ -85,27 +85,53 @@ namespace zuu::widget {
             }
         }
         
-        // Convert VK code to character with shift state
         wchar_t vk_to_char(KeyboardEvent::KeyCode key, bool shift) {
-            // Get the virtual key code
-            UINT vk = static_cast<UINT>(key);
-            
-            // Get keyboard state
-            BYTE keyboard_state[256] = {0};
-            if (shift) {
-                keyboard_state[VK_SHIFT] = 0x80;
-            }
-            
-            // Translate to character
-            wchar_t buffer[2] = {0};
-            int result = ToUnicode(vk, 0, keyboard_state, buffer, 2, 0);
-            
-            if (result == 1) {
-                return buffer[0];
-            }
-            
-            return 0;
-        }
+			UINT vk = static_cast<UINT>(key);
+			
+			// Handle alphanumeric dengan MapVirtualKey
+			if (vk >= 0x30 && vk <= 0x5A) { // 0-9, A-Z
+				BYTE keyboard_state[256] = {0};
+				if (shift) {
+					keyboard_state[VK_SHIFT] = 0x80;
+				}
+				
+				wchar_t buffer[2] = {0};
+				int result = ToUnicode(vk, 0, keyboard_state, buffer, 2, 0);
+				if (result == 1) {
+					return buffer[0];
+				}
+			}
+			
+			// Special characters dengan shift
+			if (shift) {
+				switch (key) {
+					case KeyboardEvent::KeyCode::Number1: return L'!';
+					case KeyboardEvent::KeyCode::Number2: return L'@';
+					case KeyboardEvent::KeyCode::Number3: return L'#';
+					case KeyboardEvent::KeyCode::Number4: return L'$';
+					case KeyboardEvent::KeyCode::Number5: return L'%';
+					case KeyboardEvent::KeyCode::Number6: return L'^';
+					case KeyboardEvent::KeyCode::Number7: return L'&';
+					case KeyboardEvent::KeyCode::Number8: return L'*';
+					case KeyboardEvent::KeyCode::Number9: return L'(';
+					case KeyboardEvent::KeyCode::Number0: return L')';
+					default: break;
+				}
+			} else {
+				// Numbers without shift
+				if (key >= KeyboardEvent::KeyCode::Number0 && 
+					key <= KeyboardEvent::KeyCode::Number9) {
+					return static_cast<wchar_t>(key);
+				}
+			}
+			
+			// Space
+			if (key == KeyboardEvent::KeyCode::Space) {
+				return L' ';
+			}
+			
+			return 0;
+		}
         
         bool is_shift_pressed() const {
             return (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -247,137 +273,125 @@ namespace zuu::widget {
         }
 
         bool handle_key_down(const KeyboardEvent& event) override {
-            if (!is_enabled() || !is_focused()) return false;
+			if (!is_enabled() || !is_focused()) return false;
 
-            bool handled = false;
-            auto key = event.get_key();
-            bool shift = is_shift_pressed();
-            bool ctrl = is_ctrl_pressed();
+			bool handled = false;
+			auto key = event.get_key();
+			bool shift = is_shift_pressed();
+			bool ctrl = is_ctrl_pressed();
 
-            // Handle Ctrl shortcuts
-            if (ctrl) {
-                if (key == KeyboardEvent::KeyCode::A) {
-                    select_all();
-                    handled = true;
-                }
-                else if (key == KeyboardEvent::KeyCode::C) {
-                    // TODO: Copy to clipboard
-                    handled = true;
-                }
-                else if (key == KeyboardEvent::KeyCode::V) {
-                    // TODO: Paste from clipboard
-                    handled = true;
-                }
-                else if (key == KeyboardEvent::KeyCode::X) {
-                    // TODO: Cut to clipboard
-                    handled = true;
-                }
-            }
-            // Navigation keys
-            else if (key == KeyboardEvent::KeyCode::Left) {
-                if (cursor_position_ > 0) {
-                    if (shift && !has_selection()) {
-                        selection_start_ = cursor_position_;
-                    }
-                    cursor_position_--;
-                    if (shift) {
-                        selection_end_ = cursor_position_;
-                    } else {
-                        clear_selection();
-                    }
-                }
-                cursor_blink_time_ = 0.0f;
-                cursor_visible_ = true;
-                handled = true;
-            }
-            else if (key == KeyboardEvent::KeyCode::Right) {
-                if (cursor_position_ < text_.length()) {
-                    if (shift && !has_selection()) {
-                        selection_start_ = cursor_position_;
-                    }
-                    cursor_position_++;
-                    if (shift) {
-                        selection_end_ = cursor_position_;
-                    } else {
-                        clear_selection();
-                    }
-                }
-                cursor_blink_time_ = 0.0f;
-                cursor_visible_ = true;
-                handled = true;
-            }
-            else if (key == KeyboardEvent::KeyCode::Home) {
-                if (shift && !has_selection()) {
-                    selection_start_ = cursor_position_;
-                }
-                cursor_position_ = 0;
-                if (shift) {
-                    selection_end_ = cursor_position_;
-                } else {
-                    clear_selection();
-                }
-                handled = true;
-            }
-            else if (key == KeyboardEvent::KeyCode::End) {
-                if (shift && !has_selection()) {
-                    selection_start_ = cursor_position_;
-                }
-                cursor_position_ = text_.length();
-                if (shift) {
-                    selection_end_ = cursor_position_;
-                } else {
-                    clear_selection();
-                }
-                handled = true;
-            }
-            else if (key == KeyboardEvent::KeyCode::Back) {
-                if (!read_only_) {
-                    if (has_selection()) {
-                        delete_selection();
-                    } else if (cursor_position_ > 0) {
-                        text_.erase(cursor_position_ - 1, 1);
-                        cursor_position_--;
-                        if (on_text_changed_) {
-                            on_text_changed_(this, text_);
-                        }
-                    }
-                    handled = true;
-                }
-            }
-            else if (key == KeyboardEvent::KeyCode::Delete) {
-                if (!read_only_) {
-                    if (has_selection()) {
-                        delete_selection();
-                    } else if (cursor_position_ < text_.length()) {
-                        text_.erase(cursor_position_, 1);
-                        if (on_text_changed_) {
-                            on_text_changed_(this, text_);
-                        }
-                    }
-                    handled = true;
-                }
-            }
-            else if (key == KeyboardEvent::KeyCode::Enter) {
-                if (on_enter_pressed_) {
-                    on_enter_pressed_(this);
-                }
-                handled = true;
-            }
-            // Character input - use proper conversion
-            else if (!read_only_) {
-                wchar_t ch = vk_to_char(key, shift);
-                if (ch != 0 && ch >= 32) {  // Printable character
-                    insert_character(ch);
-                    handled = true;
-                }
-            }
+			// Ctrl shortcuts
+			if (ctrl) {
+				if (key == KeyboardEvent::KeyCode::A) {
+					select_all();
+					handled = true;
+				}
+			}
+			// Navigation
+			else if (key == KeyboardEvent::KeyCode::Left) {
+				if (cursor_position_ > 0) {
+					if (shift && !has_selection()) {
+						selection_start_ = cursor_position_;
+					}
+					cursor_position_--;
+					if (shift) {
+						selection_end_ = cursor_position_;
+					} else {
+						clear_selection();
+					}
+				}
+				cursor_blink_time_ = 0.0f;
+				cursor_visible_ = true;
+				handled = true;
+			}
+			else if (key == KeyboardEvent::KeyCode::Right) {
+				if (cursor_position_ < text_.length()) {
+					if (shift && !has_selection()) {
+						selection_start_ = cursor_position_;
+					}
+					cursor_position_++;
+					if (shift) {
+						selection_end_ = cursor_position_;
+					} else {
+						clear_selection();
+					}
+				}
+				cursor_blink_time_ = 0.0f;
+				cursor_visible_ = true;
+				handled = true;
+			}
+			else if (key == KeyboardEvent::KeyCode::Home) {
+				if (shift && !has_selection()) {
+					selection_start_ = cursor_position_;
+				}
+				cursor_position_ = 0;
+				if (shift) {
+					selection_end_ = cursor_position_;
+				} else {
+					clear_selection();
+				}
+				handled = true;
+			}
+			else if (key == KeyboardEvent::KeyCode::End) {
+				if (shift && !has_selection()) {
+					selection_start_ = cursor_position_;
+				}
+				cursor_position_ = text_.length();
+				if (shift) {
+					selection_end_ = cursor_position_;
+				} else {
+					clear_selection();
+				}
+				handled = true;
+			}
+			else if (key == KeyboardEvent::KeyCode::Back) {
+				if (!read_only_) {
+					if (has_selection()) {
+						delete_selection();
+					} else if (cursor_position_ > 0) {
+						text_.erase(cursor_position_ - 1, 1);
+						cursor_position_--;
+						if (on_text_changed_) {
+							on_text_changed_(this, text_);
+						}
+					}
+					handled = true;
+				}
+			}
+			else if (key == KeyboardEvent::KeyCode::Delete) {
+				if (!read_only_) {
+					if (has_selection()) {
+						delete_selection();
+					} else if (cursor_position_ < text_.length()) {
+						text_.erase(cursor_position_, 1);
+						if (on_text_changed_) {
+							on_text_changed_(this, text_);
+						}
+					}
+					handled = true;
+				}
+			}
+			else if (key == KeyboardEvent::KeyCode::Enter) {
+				if (on_enter_pressed_) {
+					on_enter_pressed_(this);
+				}
+				handled = true;
+			}
+			// Character input - improved handling
+			else if (!read_only_) {
+				wchar_t ch = vk_to_char(key, shift);
+				if (ch != 0 && ch >= 32) {  // Printable character
+					insert_character(ch);
+					handled = true;
+				}
+			}
 
-            if (handled) {
-                mark_dirty();
-            }
+			if (handled) {
+				mark_dirty();
+			}
 
-            return handled || Widget::handle_key_down(event);
-        }
+			return handled || Widget::handle_key_down(event);
+		}
 
         // Setters
         void set_text(const std::wstring& text) {

@@ -1,8 +1,8 @@
 [
 {
   "directory": "D:/Project/zwidgetv2/build",
-  "command": "D:\\dev-tools\\LLVM\\bin\\clang-cl.exe  /nologo -TP -ID:\\Project\\zwidgetv2\\include /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od /RTC1 -clang:-std=c++23 -MDd -Zi /W4 /permissive- /FoCMakeFiles\\zwidget.dir\\src\\test_all_widget.cpp.obj /FdCMakeFiles\\zwidget.dir\\ -c -- D:\\Project\\zwidgetv2\\src\\test_all_widget.cpp",
-  "file": "D:/Project/zwidgetv2/src/test_all_widget.cpp",
-  "output": "D:/Project/zwidgetv2/build/CMakeFiles/zwidget.dir/src/test_all_widget.cpp.obj"
+  "command": "D:\\dev-tools\\LLVM\\bin\\clang-cl.exe  /nologo -TP -ID:\\Project\\zwidgetv2\\include /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od /RTC1 -clang:-std=c++23 -MDd -Zi /W4 /permissive- /FoCMakeFiles\\zwidget.dir\\src\\test_keyboard.cpp.obj /FdCMakeFiles\\zwidget.dir\\ -c -- D:\\Project\\zwidgetv2\\src\\test_keyboard.cpp",
+  "file": "D:/Project/zwidgetv2/src/test_keyboard.cpp",
+  "output": "D:/Project/zwidgetv2/build/CMakeFiles/zwidget.dir/src/test_keyboard.cpp.obj"
 }
 ]

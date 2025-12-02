@@ -2,7 +2,6 @@
 
 #include "widget.hpp"
 #include <algorithm>
-#include <functional>
 #include <cmath>
 
 namespace zuu::widget {
@@ -104,103 +103,110 @@ namespace zuu::widget {
 
     public:
         Slider() {
-            set_focusable(true);
-            style_.padding = {8.0f, 8.0f, 8.0f, 8.0f};
-        }
+			set_focusable(true);
+			style_.padding = {8.0f, 8.0f, 8.0f, 8.0f};
+			style_.background_color = Color::from_hex(0x2d2d2d);
+			style_.border_width = 1.0f;
+			style_.border_color = Color::from_hex(0x3d3d3d);
+		}
         
         explicit Slider(SliderOrientation orientation) : Slider() {
             orientation_ = orientation;
         }
         
         void render(Renderer& renderer) override {
-            if (!is_visible()) return;
-            
-            // Draw background
-            Widget::render(renderer);
-            
-            // Calculate track rect
-            basic_rect<float> track_rect;
-            if (orientation_ == SliderOrientation::Horizontal) {
-                float y = content_bounds_.y + (content_bounds_.h - track_thickness_) * 0.5f;
-                track_rect = basic_rect<float>(
-                    content_bounds_.x + thumb_size_ * 0.5f,
-                    y,
-                    content_bounds_.w - thumb_size_,
-                    track_thickness_
-                );
-            } else {
-                float x = content_bounds_.x + (content_bounds_.w - track_thickness_) * 0.5f;
-                track_rect = basic_rect<float>(
-                    x,
-                    content_bounds_.y + thumb_size_ * 0.5f,
-                    track_thickness_,
-                    content_bounds_.h - thumb_size_
-                );
-            }
-            
-            // Draw track background
-            renderer.fill_rounded_rect(
-                track_rect,
-                track_thickness_ * 0.5f,
-                track_thickness_ * 0.5f,
-                track_color_
-            );
-            
-            // Draw filled portion of track
-            float normalized = get_normalized_value();
-            basic_rect<float> fill_rect = track_rect;
-            
-            if (orientation_ == SliderOrientation::Horizontal) {
-                fill_rect.w *= normalized;
-            } else {
-                fill_rect.h *= normalized;
-            }
-            
-            if (fill_rect.w > 0 && fill_rect.h > 0) {
-                renderer.fill_rounded_rect(
-                    fill_rect,
-                    track_thickness_ * 0.5f,
-                    track_thickness_ * 0.5f,
-                    track_fill_color_
-                );
-            }
-            
-            // Draw thumb
-            auto thumb_rect = get_thumb_rect();
-            Color thumb_color = thumb_color_;
-            
-            if (!is_enabled()) {
-                thumb_color = Color(0.5f, 0.5f, 0.5f, 0.5f);
-            } else if (is_dragging_) {
-                thumb_color = thumb_active_color_;
-            } else if (is_hovered()) {
-                thumb_color = thumb_hover_color_;
-            }
-            
-            renderer.fill_circle(
-                basic_point<float>(
-                    thumb_rect.x + thumb_rect.w * 0.5f,
-                    thumb_rect.y + thumb_rect.h * 0.5f
-                ),
-                thumb_size_ * 0.5f,
-                thumb_color
-            );
-            
-            // Draw focus indicator
-            if (is_focused()) {
-                renderer.draw_circle(
-                    basic_point<float>(
-                        thumb_rect.x + thumb_rect.w * 0.5f,
-                        thumb_rect.y + thumb_rect.h * 0.5f
-                    ),
-                    thumb_size_ * 0.5f + 2.0f,
-                    Color::from_hex(0x4a90e2),
-                    2.0f
-                );
-            }
-            
-            set_flag(WidgetFlag::Dirty, false);
-        }
+			if (!is_visible()) return;
+			
+			if (style_.background_color.a() > 0) {
+				renderer.fill_rect(bounds_, style_.background_color);
+			}
+			if (style_.border_width > 0) {
+				renderer.draw_rect(bounds_, style_.border_color, style_.border_width);
+			}
+			
+			// Calculate track rect
+			basic_rect<float> track_rect;
+			if (orientation_ == SliderOrientation::Horizontal) {
+				float y = content_bounds_.y + (content_bounds_.h - track_thickness_) * 0.5f;
+				track_rect = basic_rect<float>(
+					content_bounds_.x + thumb_size_ * 0.5f,
+					y,
+					content_bounds_.w - thumb_size_,
+					track_thickness_
+				);
+			} else {
+				float x = content_bounds_.x + (content_bounds_.w - track_thickness_) * 0.5f;
+				track_rect = basic_rect<float>(
+					x,
+					content_bounds_.y + thumb_size_ * 0.5f,
+					track_thickness_,
+					content_bounds_.h - thumb_size_
+				);
+			}
+			
+			// PERBAIKAN: Pastikan track visible dengan warna yang kontras
+			renderer.fill_rounded_rect(
+				track_rect,
+				track_thickness_ * 0.5f,
+				track_thickness_ * 0.5f,
+				Color::from_hex(0x505050)  // Lebih terang
+			);
+			
+			// Draw filled portion
+			float normalized = get_normalized_value();
+			basic_rect<float> fill_rect = track_rect;
+			
+			if (orientation_ == SliderOrientation::Horizontal) {
+				fill_rect.w *= normalized;
+			} else {
+				fill_rect.h *= normalized;
+			}
+			
+			if (fill_rect.w > 0 && fill_rect.h > 0) {
+				renderer.fill_rounded_rect(
+					fill_rect,
+					track_thickness_ * 0.5f,
+					track_thickness_ * 0.5f,
+					track_fill_color_
+				);
+			}
+			
+			// Draw thumb
+			auto thumb_rect = get_thumb_rect();
+			Color thumb_color = thumb_color_;
+			
+			if (!is_enabled()) {
+				thumb_color = Color(0.5f, 0.5f, 0.5f, 0.5f);
+			} else if (is_dragging_) {
+				thumb_color = thumb_active_color_;
+			} else if (is_hovered()) {
+				thumb_color = thumb_hover_color_;
+			}
+			
+			renderer.fill_circle(
+				basic_point<float>(
+					thumb_rect.x + thumb_rect.w * 0.5f,
+					thumb_rect.y + thumb_rect.h * 0.5f
+				),
+				thumb_size_ * 0.5f,
+				thumb_color
+			);
+			
+			// Draw focus indicator
+			if (is_focused()) {
+				renderer.draw_circle(
+					basic_point<float>(
+						thumb_rect.x + thumb_rect.w * 0.5f,
+						thumb_rect.y + thumb_rect.h * 0.5f
+					),
+					thumb_size_ * 0.5f + 2.0f,
+					Color::from_hex(0x4a90e2),
+					2.0f
+				);
+			}
+			
+			set_flag(WidgetFlag::Dirty, false);
+		}
         
         bool handle_mouse_down(const MouseEvent& event) override {
             if (!is_enabled()) return false;
