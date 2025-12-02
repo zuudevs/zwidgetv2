@@ -5,6 +5,9 @@
 #include <limits>  
 
 namespace zuu::widget {
+	template <std::arithmetic T>
+	class basic_point ;
+	
     template <std::arithmetic T>
     class basic_size {
     public :

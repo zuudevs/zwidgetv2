@@ -1,7 +1,6 @@
 #pragma once
 
-#include "zwidget/unit/point.hpp"
-#include "zwidget/unit/size.hpp"
+#include "zwidget/detail/basic_cast.hpp"
 
 namespace zuu::widget {
 

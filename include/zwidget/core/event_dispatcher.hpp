@@ -74,13 +74,6 @@ namespace zuu::widget {
                     return true;
                 }
 
-                // Get Window from HWND
-                Window* window = Application::get_window(msg.hwnd);
-                Event event = detail::CreateEventFromMSG(window, msg);
-                if (event.get_type() != Event::Type::none) {
-                    push_event(event);
-                }
-
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
@@ -118,12 +111,6 @@ namespace zuu::widget {
 					out_event = event_queue_.front();
 					event_queue_.pop();
 					return true;
-				}
-
-				Window* window = Application::get_window(msg.hwnd);
-				Event event = detail::CreateEventFromMSG(window, msg);
-				if (event.get_type() != Event::Type::none) {
-					push_event(event);
 				}
 
 				TranslateMessage(&msg);

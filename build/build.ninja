@@ -49,7 +49,7 @@ cmake_ninja_workdir = D$:\Project\zwidgetv2\build\
 
 build cmake_object_order_depends_target_zwidget: phony || .
 
-build CMakeFiles\zwidget.dir\src\test_keyboard.cpp.obj: CXX_COMPILER__zwidget_unscanned_Debug D$:\Project\zwidgetv2\src\test_keyboard.cpp || cmake_object_order_depends_target_zwidget
+build CMakeFiles\zwidget.dir\src\test_all_widget.cpp.obj: CXX_COMPILER__zwidget_unscanned_Debug D$:\Project\zwidgetv2\src\test_all_widget.cpp || cmake_object_order_depends_target_zwidget
   CONFIG = Debug
   FLAGS = /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od /RTC1 -clang:-std=c++23 -MDd -Zi /W4 /permissive-
   INCLUDES = -ID:\Project\zwidgetv2\include
@@ -67,7 +67,7 @@ build CMakeFiles\zwidget.dir\src\test_keyboard.cpp.obj: CXX_COMPILER__zwidget_un
 #############################################
 # Link the executable D:\Project\zwidgetv2\bin\zwidget.exe
 
-build D$:\Project\zwidgetv2\bin\zwidget.exe: CXX_EXECUTABLE_LINKER__zwidget_Debug CMakeFiles\zwidget.dir\src\test_keyboard.cpp.obj
+build D$:\Project\zwidgetv2\bin\zwidget.exe: CXX_EXECUTABLE_LINKER__zwidget_Debug CMakeFiles\zwidget.dir\src\test_all_widget.cpp.obj
   CONFIG = Debug
   FLAGS = /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od /RTC1 -MDd -Zi
   LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console
