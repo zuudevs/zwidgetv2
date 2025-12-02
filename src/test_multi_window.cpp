@@ -144,12 +144,12 @@ int main() {
                     break;
                 }
 
-                // Find which window this event belongs to
-                HWND event_hwnd = event.get_hwnd();
+                // Find which window this event belongs to using Window pointer
+                Window* event_window = event.get_window();
                 std::string window_name = "Unknown";
                 
                 for (auto& info : windows) {
-                    if (info.window->get_handle() == event_hwnd) {
+                    if (info.window.get() == event_window) {
                         window_name = info.name;
                         break;
                     }
@@ -163,7 +163,7 @@ int main() {
                     if (we->get_type() == WindowEvent::Type::close) {
                         // Find and close window
                         for (auto it = windows.begin(); it != windows.end(); ++it) {
-                            if (it->window->get_handle() == event_hwnd) {
+                            if (it->window.get() == event_window) {
                                 std::println("   → Closing window: {}", it->name);
                                 it->window->close();
                                 windows.erase(it);
@@ -180,7 +180,7 @@ int main() {
                         ke->get_key() == KeyboardEvent::KeyCode::Escape) {
                         
                         for (auto it = windows.begin(); it != windows.end(); ++it) {
-                            if (it->window->get_handle() == event_hwnd) {
+                            if (it->window.get() == event_window) {
                                 std::println("   → ESC pressed, closing: {}", it->name);
                                 it->window->close();
                                 windows.erase(it);

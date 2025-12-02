@@ -1,7 +1,7 @@
 [
 {
   "directory": "D:/Project/zwidgetv2/build",
-  "command": "D:\\dev-tools\\LLVM\\bin\\clang-cl.exe  /nologo -TP -D_MBCS -ID:\\Project\\zwidgetv2\\include /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od -clang:-std=c++23 -MDd -RTC1 -Zi /FoCMakeFiles\\zwidget.dir\\src\\test_multi_window.cpp.obj /FdCMakeFiles\\zwidget.dir\\ -c -- D:\\Project\\zwidgetv2\\src\\test_multi_window.cpp",
+  "command": "D:\\dev-tools\\LLVM\\bin\\clang-cl.exe  /nologo -TP -ID:\\Project\\zwidgetv2\\include /DWIN32 /D_WINDOWS /EHsc /Ob0 /Od /RTC1 -clang:-std=c++23 -MDd -Zi /W4 /permissive- /FoCMakeFiles\\zwidget.dir\\src\\test_multi_window.cpp.obj /FdCMakeFiles\\zwidget.dir\\ -c -- D:\\Project\\zwidgetv2\\src\\test_multi_window.cpp",
   "file": "D:/Project/zwidgetv2/src/test_multi_window.cpp",
   "output": "D:/Project/zwidgetv2/build/CMakeFiles/zwidget.dir/src/test_multi_window.cpp.obj"
 }

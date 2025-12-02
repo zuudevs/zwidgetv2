@@ -1,12 +1,17 @@
 #pragma once
 
+
 #include "zwidget/unit/event.hpp"
 
+namespace zuu::widget {
+	class Window; // Forward declaration
+}
+
 namespace zuu::detail {
-	[[nodiscard]] inline widget::Event CreateEventFromMSG(const MSG& msg) noexcept {
+	[[nodiscard]] inline widget::Event CreateEventFromMSG(widget::Window* window, const MSG& msg) noexcept {
 		switch (msg.message) {
 			case WM_CLOSE : return widget::Event::create_window_event(
-				msg.hwnd,
+				window,
 				widget::WindowEvent(widget::WindowEvent::Type::close)
 			) ;
 			case WM_SIZE : {
@@ -24,7 +29,7 @@ namespace zuu::detail {
 						break ;
 				}
 				return widget::Event::create_window_event(
-					msg.hwnd,
+					window,
 					widget::WindowEvent(
 						type,
 						widget::basic_size<uint16_t>(
@@ -37,7 +42,7 @@ namespace zuu::detail {
 
 			case WM_MOUSEMOVE : {
 				return widget::Event::create_mouse_event(
-					msg.hwnd,
+					window,
 					widget::MouseEvent(
 						widget::MouseEvent::Type::move,
 						widget::basic_point<uint16_t>(
@@ -50,7 +55,7 @@ namespace zuu::detail {
 
 			case WM_MOUSEWHEEL : {
 				return widget::Event::create_mouse_event(
-					msg.hwnd,
+					window,
 					widget::MouseEvent(
 						widget::MouseEvent::Type::scroll,
 						static_cast<uint16_t>(GET_WHEEL_DELTA_WPARAM(msg.wParam) / WHEEL_DELTA)
@@ -75,7 +80,7 @@ namespace zuu::detail {
 					default : button = widget::MouseEvent::Button::none ; break ;
 				}
 				return widget::Event::create_mouse_event(
-					msg.hwnd,
+					window,
 					widget::MouseEvent(
 						widget::MouseEvent::Type::button_press,
 						button,
@@ -104,7 +109,7 @@ namespace zuu::detail {
 					default : button = widget::MouseEvent::Button::none ; break ;
 				}
 				return widget::Event::create_mouse_event(
-					msg.hwnd,
+					window,
 					widget::MouseEvent(
 						widget::MouseEvent::Type::button_release,
 						button,
@@ -122,7 +127,7 @@ namespace zuu::detail {
 			case WM_SYSKEYUP : {
 				bool is_press = (msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN) ;
 				return widget::Event::create_keyboard_event(
-					msg.hwnd,
+					window,
 					widget::KeyboardEvent(
 						is_press
 						 ? widget::KeyboardEvent::Type::key_press

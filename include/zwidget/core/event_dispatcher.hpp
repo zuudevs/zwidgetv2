@@ -1,7 +1,8 @@
 #pragma once
 
 #include "zwidget/unit/event.hpp"
-#include "event_translater.hpp"
+#include "event_translator.hpp"
+#include "application.hpp"
 #include <queue>
 #include <mutex>
 #include <Windows.h>
@@ -73,7 +74,9 @@ namespace zuu::widget {
                     return true;
                 }
 
-                Event event = detail::CreateEventFromMSG(msg);
+                // Get Window from HWND
+                Window* window = Application::get_window(msg.hwnd);
+                Event event = detail::CreateEventFromMSG(window, msg);
                 if (event.get_type() != Event::Type::none) {
                     push_event(event);
                 }
@@ -117,7 +120,9 @@ namespace zuu::widget {
                     return true;
                 }
 
-                Event event = detail::CreateEventFromMSG(msg);
+                // Get Window from HWND
+                Window* window = Application::get_window(msg.hwnd);
+                Event event = detail::CreateEventFromMSG(window, msg);
                 if (event.get_type() != Event::Type::none) {
                     push_event(event);
                 }

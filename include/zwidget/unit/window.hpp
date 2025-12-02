@@ -2,11 +2,13 @@
 
 #include "zwidget/core/application.hpp"
 #include "zwidget/core/event_dispatcher.hpp"
+#include "zwidget/graphic/renderer.hpp"
 #include "zwidget/unit/point.hpp"
 #include "zwidget/unit/size.hpp"
 #include "zwidget/unit/rect.hpp"
 #include <string>
 #include <atomic>
+#include <functional>
 #include <Windows.h>
 
 namespace zuu::widget {
@@ -27,10 +29,20 @@ namespace zuu::widget {
         friend class Application;
         friend LRESULT CALLBACK GlobalWindowProc(HWND, UINT, WPARAM, LPARAM);
 
+    public:
+        using PaintCallback = std::function<void(Renderer&)>;
+
     private:
         HWND hwnd_ = nullptr;
         std::atomic<uint32_t> state_{0};
         std::string title_;
+        Renderer renderer_;
+        PaintCallback paint_callback_;
+
+        // HWND hanya bisa diakses oleh Application dan GlobalWindowProc
+        HWND get_handle() const noexcept {
+            return hwnd_;
+        }
 
         void internal_destroy() noexcept {
             if (has_state_flag(WindowState::Destroyed)) {
@@ -81,6 +93,23 @@ namespace zuu::widget {
             return (current & static_cast<uint32_t>(flag)) != 0;
         }
 
+        // Handle WM_PAINT
+        void handle_paint() {
+            if (!renderer_.is_initialized()) return;
+
+            PAINTSTRUCT ps;
+            BeginPaint(hwnd_, &ps);
+
+            // Render dengan paint callback
+            if (paint_callback_) {
+                renderer_.render([this](Renderer& r) {
+                    paint_callback_(r);
+                });
+            }
+
+            EndPaint(hwnd_, &ps);
+        }
+
     public:
         Window() = delete;
         Window(const Window&) = delete;
@@ -117,6 +146,11 @@ namespace zuu::widget {
             set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
             set_state_flag(WindowState::Registered);
+
+            // Initialize renderer
+            if (!renderer_.initialize(hwnd_, size)) {
+                throw std::runtime_error("Failed to initialize renderer");
+            }
         }
 
         Window(
@@ -151,6 +185,11 @@ namespace zuu::widget {
             set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
             set_state_flag(WindowState::Registered);
+
+            // Initialize renderer
+            if (!renderer_.initialize(hwnd_, size)) {
+                throw std::runtime_error("Failed to initialize renderer");
+            }
         }
 
         Window(
@@ -184,12 +223,19 @@ namespace zuu::widget {
             set_state_flag(WindowState::Active);
             Application::register_window(hwnd_, this);
             set_state_flag(WindowState::Registered);
+
+            // Initialize renderer
+            if (!renderer_.initialize(hwnd_, basic_size<int>(rect.w, rect.h))) {
+                throw std::runtime_error("Failed to initialize renderer");
+            }
         }
 
         Window(Window&& other) noexcept
             : hwnd_(std::exchange(other.hwnd_, nullptr))
             , state_(other.state_.exchange(0, std::memory_order_acq_rel))
-            , title_(std::move(other.title_)) {
+            , title_(std::move(other.title_))
+            , renderer_(std::move(other.renderer_))
+            , paint_callback_(std::move(other.paint_callback_)) {
             
             if (hwnd_) {
                 Application::unregister_window(hwnd_);
@@ -205,6 +251,8 @@ namespace zuu::widget {
                 state_.store(other.state_.exchange(0, std::memory_order_acq_rel), 
                            std::memory_order_release);
                 title_ = std::move(other.title_);
+                renderer_ = std::move(other.renderer_);
+                paint_callback_ = std::move(other.paint_callback_);
 
                 if (hwnd_) {
                     Application::unregister_window(hwnd_);
@@ -218,6 +266,7 @@ namespace zuu::widget {
             internal_destroy();
         }
 
+        // Window operations
         void show() noexcept {
             if (hwnd_) {
                 ShowWindow(hwnd_, SW_SHOW);
@@ -297,11 +346,28 @@ namespace zuu::widget {
             }
         }
 
-        // Property getters
-        HWND get_handle() const noexcept {
-            return hwnd_;
+        // Rendering operations
+        void set_paint_callback(PaintCallback callback) {
+            paint_callback_ = std::move(callback);
         }
 
+        void invalidate() {
+            renderer_.invalidate_full();
+        }
+
+        void invalidate(const basic_rect<int>& region) {
+            renderer_.invalidate(region);
+        }
+
+        Renderer& get_renderer() noexcept {
+            return renderer_;
+        }
+
+        const Renderer& get_renderer() const noexcept {
+            return renderer_;
+        }
+
+        // Property getters
         const std::string& get_title() const noexcept {
             return title_;
         }
@@ -380,31 +446,19 @@ namespace zuu::widget {
         Window* window = Application::get_window(hwnd);
 
         switch (msg) {
-            case WM_CLOSE: {
+            case WM_PAINT: {
                 if (window) {
-                    window->set_state_flag(WindowState::CloseRequested);
-                }
-
-                Event event = Event::create_window_event(
-                    hwnd,
-                    WindowEvent(WindowEvent::Type::close)
-                );
-                EventDispatcher::push_event(event);
-                
-                return 0;
-            }
-
-            case WM_DESTROY: {
-                Application::unregister_window(hwnd);
-
-                if (Application::window_count() == 0) {
-                    Application::is_running_.store(false, std::memory_order_release);
-                    PostQuitMessage(0);
+                    window->handle_paint();
                 }
                 return 0;
             }
 
             case WM_SIZE: {
+                if (window && wParam != SIZE_MINIMIZED) {
+                    auto new_size = basic_size<int>(LOWORD(lParam), HIWORD(lParam));
+                    window->renderer_.resize(new_size);
+                }
+
                 WindowEvent::Type type;
                 switch (wParam) {
                     case SIZE_MINIMIZED:
@@ -426,7 +480,7 @@ namespace zuu::widget {
                 }
 
                 Event event = Event::create_window_event(
-                    hwnd,
+                    window,
                     WindowEvent(
                         type,
                         basic_size<uint16_t>(
@@ -439,13 +493,37 @@ namespace zuu::widget {
                 break;
             }
 
+            case WM_CLOSE: {
+                if (window) {
+                    window->set_state_flag(WindowState::CloseRequested);
+                }
+
+                Event event = Event::create_window_event(
+                    window,
+                    WindowEvent(WindowEvent::Type::close)
+                );
+                EventDispatcher::push_event(event);
+                
+                return 0;
+            }
+
+            case WM_DESTROY: {
+                Application::unregister_window(hwnd);
+
+                if (Application::window_count() == 0) {
+                    Application::is_running_.store(false, std::memory_order_release);
+                    PostQuitMessage(0);
+                }
+                return 0;
+            }
+
             case WM_SETFOCUS: {
                 if (window) {
                     window->set_state_flag(WindowState::Focused);
                 }
 
                 Event event = Event::create_window_event(
-                    hwnd,
+                    window,
                     WindowEvent(WindowEvent::Type::focus_gained)
                 );
                 EventDispatcher::push_event(event);
@@ -458,7 +536,7 @@ namespace zuu::widget {
                 }
 
                 Event event = Event::create_window_event(
-                    hwnd,
+                    window,
                     WindowEvent(WindowEvent::Type::focus_lost)
                 );
                 EventDispatcher::push_event(event);
@@ -476,7 +554,7 @@ namespace zuu::widget {
             case WM_XBUTTONUP:
             case WM_MOUSEWHEEL: {
                 MSG temp_msg = { hwnd, msg, wParam, lParam };
-                Event event = detail::CreateEventFromMSG(temp_msg);
+                Event event = detail::CreateEventFromMSG(window, temp_msg);
                 if (event.get_type() != Event::Type::none) {
                     EventDispatcher::push_event(event);
                 }
@@ -488,7 +566,7 @@ namespace zuu::widget {
             case WM_SYSKEYDOWN:
             case WM_SYSKEYUP: {
                 MSG temp_msg = { hwnd, msg, wParam, lParam };
-                Event event = detail::CreateEventFromMSG(temp_msg);
+                Event event = detail::CreateEventFromMSG(window, temp_msg);
                 if (event.get_type() != Event::Type::none) {
                     EventDispatcher::push_event(event);
                 }

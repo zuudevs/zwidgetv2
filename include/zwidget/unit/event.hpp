@@ -1,10 +1,5 @@
 #pragma once
 
-#include "events/window.hpp"
-#include "events/mouse.hpp"
-#include "events/keyboard.hpp"
-#include "zwidget/detail/variant.hpp"
-
 #include <Windows.h>
 #include <Windowsx.h>
 
@@ -13,7 +8,15 @@
     #undef min
 #endif
 
+#include "events/window.hpp"
+#include "events/mouse.hpp"
+#include "events/keyboard.hpp"
+#include "zwidget/detail/variant.hpp"
+
 namespace zuu::widget {
+    // Forward declaration
+    class Window;
+
     class Event {
     public:
         enum class Type : uint8_t {
@@ -29,12 +32,12 @@ namespace zuu::widget {
         using events_t = std::variant<EmptyEvent, WindowEvent, MouseEvent, KeyboardEvent>;
 
     private:
-        HWND hwnd_{};
+        Window* window_{nullptr};
         Type type_ = Type::none;
         events_t event{};
 
-        constexpr Event(HWND hwnd, Type type, events_t event) noexcept
-            : hwnd_(hwnd), type_(type), event(event) {}
+        constexpr Event(Window* window, Type type, events_t event) noexcept
+            : window_(window), type_(type), event(event) {}
 
     public:
         constexpr Event() noexcept = default;
@@ -44,7 +47,7 @@ namespace zuu::widget {
         constexpr Event& operator=(Event&&) noexcept = default;
         constexpr ~Event() noexcept = default;
 
-        static constexpr Event create_window_event(HWND hwnd, const WindowEvent& event) noexcept {
+        static constexpr Event create_window_event(Window* window, const WindowEvent& event) noexcept {
             auto type = event.get_type();
             bool has_size = !event.get_size().is_empty();
 
@@ -56,10 +59,10 @@ namespace zuu::widget {
                 return Event{};
             }
 
-            return Event(hwnd, Type::window, event);
+            return Event(window, Type::window, event);
         }
 
-        static constexpr Event create_mouse_event(HWND hwnd, const MouseEvent& event) noexcept {
+        static constexpr Event create_mouse_event(Window* window, const MouseEvent& event) noexcept {
             auto type = event.get_type();
             bool has_position = !event.get_position().is_empty();
 
@@ -71,11 +74,11 @@ namespace zuu::widget {
                 return Event{};
             }
 
-            return Event(hwnd, Type::mouse, event);
+            return Event(window, Type::mouse, event);
         }
 
-        static constexpr Event create_keyboard_event(HWND hwnd, const KeyboardEvent& event) noexcept {
-            return Event(hwnd, Type::keyboard, event);
+        static constexpr Event create_keyboard_event(Window* window, const KeyboardEvent& event) noexcept {
+            return Event(window, Type::keyboard, event);
         }
 
         static constexpr Event create_quit_event() noexcept {
@@ -83,8 +86,8 @@ namespace zuu::widget {
         }
 
         // Getters
-        constexpr HWND get_hwnd() const noexcept {
-            return hwnd_;
+        constexpr Window* get_window() const noexcept {
+            return window_;
         }
 
         constexpr Type get_type() const noexcept {

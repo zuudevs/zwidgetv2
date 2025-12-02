@@ -15,6 +15,7 @@
 namespace zuu::widget {
 
     class Window;
+	class EventDispatcher;
     
     enum class WindowState : uint32_t {
         None            = 0,
@@ -63,6 +64,7 @@ namespace zuu::widget {
 
     class Application {
         friend class Window;
+		friend class EventDispatcher;
         friend LRESULT CALLBACK GlobalWindowProc(HWND, UINT, WPARAM, LPARAM);
 
     private:
